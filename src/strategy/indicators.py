@@ -193,8 +193,8 @@ def calculate_pivot_trend(df: pd.DataFrame, pivot_length: int = 10,
     )
     
     # Fill forward pivot values and apply ATR offset
-    pivot_high_level = pivot_high.fillna(method='ffill') + (atr * atr_mult)
-    pivot_low_level = pivot_low.fillna(method='ffill') - (atr * atr_mult)
+    pivot_high_level = pivot_high.ffill() + (atr * atr_mult)
+    pivot_low_level = pivot_low.ffill() - (atr * atr_mult)
     
     # Trend signal
     trend = np.where(close > pivot_high_level, 1,  # Bullish

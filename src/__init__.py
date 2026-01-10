@@ -5,17 +5,11 @@ A comprehensive Python framework for walk-forward optimization of the QTAlgo Sup
 trading strategy with production-ready deployment capabilities.
 """
 
-from .strategy import *
-from .data import *
-from .optimization import *
-from .utils import *
-
 __version__ = '1.0.0'
 __author__ = 'QTAlgo Team'
 
-__all__ = [
-    'strategy',
-    'data',
-    'optimization',
-    'utils'
-]
+# Modules can be imported individually:
+# from src.strategy import indicators, signals, exits
+# from src.data import loader
+# from src.optimization import walk_forward, metrics, parameter_space
+# from src.utils import plotting, reporting
