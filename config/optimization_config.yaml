@@ -1,0 +1,99 @@
+# Walk-Forward Optimization Configuration
+
+# Walk-Forward Settings
+walk_forward:
+  mode: "rolling"             # "rolling" or "anchored"
+  train_period_months: 12     # Training period in months
+  test_period_months: 3       # Testing period in months
+  step_months: 3              # Step size for rolling window (ignored for anchored)
+  min_train_periods: 252      # Minimum training periods (days)
+
+# Optimization Settings
+optimization:
+  algorithm: "optuna"         # "optuna", "grid_search", "random_search"
+  n_trials: 100               # Number of optimization trials (for optuna/random)
+  timeout_seconds: 3600       # Timeout for optimization (1 hour)
+  n_jobs: -1                  # Number of parallel jobs (-1 = all cores)
+  
+  # Multi-objective optimization weights
+  objectives:
+    sharpe_ratio:
+      weight: 0.4
+      direction: "maximize"
+    max_drawdown:
+      weight: 0.3
+      direction: "minimize"
+    win_rate:
+      weight: 0.2
+      direction: "maximize"
+    profit_factor:
+      weight: 0.1
+      direction: "maximize"
+
+# Data Settings
+data:
+  timeframe: "1h"             # Timeframe: 1m, 5m, 15m, 1h, 4h, 1d
+  symbols:                    # List of symbols to optimize
+    - "BTCUSD"
+    - "ETHUSD"
+  data_source: "csv"          # "csv", "database", "api"
+  data_path: "data/raw/"      # Path to data files
+  start_date: "2018-01-01"    # Start date for historical data
+  end_date: null              # End date (null = present)
+
+# Performance Metrics
+metrics:
+  required_metrics:
+    - "sharpe_ratio"
+    - "sortino_ratio"
+    - "calmar_ratio"
+    - "max_drawdown"
+    - "avg_drawdown"
+    - "win_rate"
+    - "profit_factor"
+    - "total_return"
+    - "annual_return"
+    - "volatility"
+    - "total_trades"
+  
+  risk_free_rate: 0.02        # Risk-free rate for Sharpe/Sortino
+
+# Walk-Forward Efficiency
+efficiency:
+  calculate_wfe: true         # Calculate Walk-Forward Efficiency
+  min_wfe_threshold: 0.5      # Minimum acceptable WFE
+  track_parameter_stability: true
+
+# Results Storage
+storage:
+  save_results: true
+  output_dir: "results/"
+  save_plots: true
+  save_trades: true
+  save_parameters: true
+  
+  # Database settings (optional)
+  use_database: false
+  database_url: null          # Set via environment variable
+
+# Backtesting Settings
+backtest:
+  initial_capital: 10000.0
+  commission: 0.001           # 0.1% per trade
+  slippage: 0.0005           # 0.05% slippage
+  position_size: 1.0          # Position size (1.0 = 100% of capital)
+  allow_shorts: true
+  compound: true              # Compound returns
+
+# Logging
+logging:
+  level: "INFO"               # DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/optimization.log"
+  console_output: true
+
+# Railway Deployment Settings
+railway:
+  enabled: false
+  api_port: 8000
+  schedule_cron: "0 0 * * 0"  # Run weekly on Sunday at midnight
+  auto_deploy: false

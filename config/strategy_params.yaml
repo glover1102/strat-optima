@@ -1,0 +1,84 @@
+# QTAlgo Super26 Strategy Parameters Configuration
+
+# Entry Signal Parameters
+entry:
+  strongTrendMinScore: 1.5    # Minimum score for strong trend entries
+  weakTrendMinScore: 3.0      # Minimum score for weak trend entries
+
+# Risk Management Parameters
+risk:
+  stopLossPercent: 2.0        # Initial stop loss percentage
+  takeProfitPercent: 4.0      # Final take profit percentage
+  partialExitPercent: 1.0     # First take profit level
+  trailingStopPercent: 0.8    # Trailing stop distance
+
+# ADX Parameters
+adx:
+  threshold: 20               # ADX trend strength threshold
+  length: 14                  # ADX length
+  diLength: 14                # DI length
+  smoothing: 14               # ADX smoothing
+
+# Indicator Weights (0.0 to 1.0)
+weights:
+  w_adx: 1.0                  # ADX weight
+  w_regime: 1.0               # Regime filter weight
+  w_pivotTrend: 1.0           # Pivot trend weight
+  w_trendDuration: 1.0        # Trend duration forecast weight
+  w_mlSupertrend: 1.0         # ML Adaptive SuperTrend weight
+  w_linReg: 1.0               # Linear regression channel weight
+  w_pivotLevels: 1.0          # Pivot levels weight
+
+# Regime Filter Parameters
+regime:
+  hma_length: 21              # Hull Moving Average length
+  volume_length: 20           # Volume MA length
+  volume_multiplier: 1.5      # Volume threshold multiplier
+
+# Pivot Trend Parameters
+pivot_trend:
+  left_bars: 4                # Left bars for pivot detection
+  right_bars: 2               # Right bars for pivot detection
+  atr_length: 14              # ATR length for offset
+  atr_multiplier: 0.5         # ATR multiplier for offset
+
+# Trend Duration Forecast Parameters
+trend_duration:
+  hma_length: 34              # HMA length for trend detection
+  smoothing: 8                # Smoothing period
+
+# ML Adaptive SuperTrend Parameters
+ml_supertrend:
+  length: 10                  # SuperTrend length
+  multiplier: 3.0             # Base multiplier
+  atr_length: 14              # ATR calculation length
+  volatility_window: 100      # Window for volatility percentile
+
+# Linear Regression Parameters
+linreg:
+  length: 50                  # Linear regression length
+  deviation: 2.0              # Standard deviation multiplier
+  slope_threshold: 0.0001     # Minimum slope for trend
+
+# Pivot Levels Parameters
+pivot_levels:
+  atr_multiplier: 1.5         # ATR multiplier for proximity
+  lookback: 20                # Lookback period for pivots
+
+# Parameter Optimization Ranges
+optimization_ranges:
+  strongTrendMinScore: [1.0, 2.5, 0.1]     # [min, max, step]
+  weakTrendMinScore: [2.0, 4.0, 0.2]
+  stopLossPercent: [1.0, 3.0, 0.2]
+  takeProfitPercent: [2.0, 6.0, 0.5]
+  partialExitPercent: [0.5, 2.0, 0.1]
+  trailingStopPercent: [0.5, 1.5, 0.1]
+  adxThreshold: [15, 30, 2]
+  adx_length: [10, 20, 2]
+  w_adx: [0.5, 1.5, 0.1]
+  w_regime: [0.5, 1.5, 0.1]
+  w_pivotTrend: [0.5, 1.5, 0.1]
+  w_trendDuration: [0.5, 1.5, 0.1]
+  w_mlSupertrend: [0.5, 1.5, 0.1]
+  w_linReg: [0.5, 1.5, 0.1]
+  w_pivotLevels: [0.5, 1.5, 0.1]
