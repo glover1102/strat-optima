@@ -37,7 +37,7 @@ setup(
         "plotly>=5.17.0,<6.0.0",
         "matplotlib>=3.7.0,<4.0.0",
         "fastapi>=0.104.0,<1.0.0",
-        "uvicorn>=0.24.0,<1.0.0",
+        "uvicorn[standard]>=0.24.0,<1.0.0",
         "pydantic>=2.4.0,<3.0.0",
         "python-dotenv>=1.0.0,<2.0.0",
         "PyYAML>=6.0,<7.0",
