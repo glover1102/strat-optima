@@ -1,19 +1,36 @@
-# QTAlgo Super26 Strategy Walk-Forward Optimization Framework
+# QTAlgo Super26 Strategy Backtesting Environment
 
 ## Overview
 
-The **QTAlgo Super26 Strategy Walk-Forward Optimization Framework** is a comprehensive Python-based algorithmic trading optimization system that implements robust walk-forward analysis for the QTAlgo Super26 trading strategy. This production-ready framework provides advanced backtesting capabilities with rigorous out-of-sample validation to ensure strategy performance reliability and minimize overfitting risks.
+This is a simple Python-based backtesting environment for the **QTAlgo Super26 Strategy**. It provides a streamlined way to test the strategy against historical OHLCV (Open, High, Low, Close, Volume) data and evaluate its performance.
 
-## Key Features
+The strategy combines 7 technical indicators with a dynamic scoring system to generate entry signals and uses a 3-stage exit management system for trade management.
+
+## Quick Start
+
+Get up and running in 3 steps:
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Run backtest with sample data
+python main.py --data data/sample_data.csv
+
+# 3. View results
+# - Performance metrics printed to console
+# - Trade details in backtest_trades.csv
+# - Equity curve in backtest_equity.csv
+```
+
+## Features
 
 - **Complete Strategy Implementation**: All 7 indicators (ADX, Regime Filter, Pivot Trend, Trend Duration, ML SuperTrend, Linear Regression, Pivot Levels)
 - **Dynamic Signal Generation**: Multi-indicator scoring system with ADX-based penalties
 - **3-Stage Exit Management**: Initial stop loss, partial profit taking, trailing stops
-- **Walk-Forward Optimization**: Both anchored and rolling window approaches
-- **Parameter Stability Tracking**: Monitor parameter consistency across windows
-- **Comprehensive Metrics**: Sharpe ratio, max drawdown, win rate, profit factor, and more
-- **Interactive Visualizations**: Plotly-based dashboards and analysis tools
-- **Production Deployment**: Docker and Railway.app ready with FastAPI web interface
+- **CSV Data Loading**: Load 5+ years of historical OHLCV data from CSV files
+- **Simple Configuration**: YAML-based strategy parameter configuration
+- **Performance Metrics**: Key metrics including Total Return, Max Drawdown, Win Rate, and Profit Factor
 
 ## Project Structure
 
@@ -21,44 +38,28 @@ The **QTAlgo Super26 Strategy Walk-Forward Optimization Framework** is a compreh
 strat-optima/
 ├── src/
 │   ├── strategy/
-│   │   ├── __init__.py
 │   │   ├── indicators.py      # All 7 technical indicators
 │   │   ├── signals.py         # Signal generation logic
 │   │   └── exits.py           # 3-stage exit management
-│   ├── optimization/
-│   │   ├── __init__.py
-│   │   ├── walk_forward.py    # Main WFO engine
-│   │   ├── parameter_space.py # Parameter definitions
-│   │   └── metrics.py         # Performance calculations
 │   ├── data/
-│   │   ├── __init__.py
-│   │   └── loader.py          # OHLCV data handling
-│   └── utils/
-│       ├── __init__.py
-│       ├── plotting.py        # Visualization tools
-│       └── reporting.py       # Results analysis
+│   │   └── loader.py          # CSV data handling
+│   ├── backtest.py            # Backtesting engine
+│   └── metrics.py             # Performance calculations
 ├── config/
-│   ├── strategy_params.yaml       # Strategy parameters
-│   └── optimization_config.yaml   # Optimization settings
-├── tests/
-│   └── test_strategy.py          # Test suite
-├── notebooks/
-│   └── strategy_analysis.ipynb   # Analysis notebooks
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Docker configuration
-├── railway.json                  # Railway deployment config
-├── main.py                       # Main entry point
+│   └── strategy_params.yaml   # Strategy parameters
+├── data/                      # Place your CSV data files here
+├── requirements.txt           # Python dependencies
+├── main.py                    # Main entry point
 └── README.md
 ```
 
 ## Installation
 
 ### Prerequisites
-- Python 3.11+
-- TA-Lib (for technical indicators)
-- Sufficient computational resources for optimization
+- Python 3.8+
+- pip package manager
 
-### Local Installation
+### Setup
 
 ```bash
 # Clone the repository
@@ -68,229 +69,150 @@ cd strat-optima
 # Install Python dependencies
 pip install -r requirements.txt
 
-# For TA-Lib on macOS
-brew install ta-lib
-
-# For TA-Lib on Ubuntu/Debian
-sudo apt-get install ta-lib
-
-# Create necessary directories
-mkdir -p logs results data
+# Create data directory
+mkdir -p data
 ```
 
-### Docker Installation
+## Data Format
 
-```bash
-# Build Docker image
-docker build -t strat-optima .
+The backtester expects CSV files with the following columns:
 
-# Run container
-docker run -p 8000:8000 -v $(pwd)/results:/app/results strat-optima
+- **date**: Date/timestamp column (will be used as index)
+- **open**: Opening price
+- **high**: Highest price
+- **low**: Lowest price  
+- **close**: Closing price
+- **volume**: Trading volume (optional, will be set to 0 if missing)
+
+Example CSV format:
+```csv
+date,open,high,low,close,volume
+2019-01-02,154.89,158.85,154.23,157.92,37039700
+2019-01-03,143.98,145.72,142.00,142.19,91312200
+...
 ```
+
+Place your CSV data files in the `data/` directory.
 
 ## Usage
 
-### Command-Line Interface
+### Basic Backtest
 
-**Run optimization for single symbol:**
+Run a backtest with default parameters:
+
 ```bash
-python main.py --symbols SPY --start-date 2018-01-01 --n-trials 100
+python main.py --data data/your_data.csv
 ```
 
-**Run optimization for multiple symbols:**
+### Custom Configuration
+
+Specify a custom configuration file:
+
 ```bash
-python main.py --symbols SPY QQQ IWM --start-date 2018-01-01 --n-trials 50
+python main.py --data data/your_data.csv --config config/strategy_params.yaml
 ```
 
-**Use different optimization algorithm:**
+### Custom Initial Capital
+
+Set a different initial capital amount:
+
 ```bash
-python main.py --symbols SPY --algorithm optuna --n-trials 100
+python main.py --data data/your_data.csv --initial-capital 50000
 ```
 
-### Web Interface (FastAPI)
+### Command-Line Options
 
-**Start the server:**
-```bash
-python main.py --mode server --port 8000
-```
-
-**API Endpoints:**
-
-- `GET /` - API information
-- `GET /health` - Health check
-- `GET /status` - Get optimization status
-- `POST /optimize` - Start new optimization
-- `GET /results` - Get optimization results
-
-**Example API request:**
-```bash
-curl -X POST "http://localhost:8000/optimize" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "symbols": ["SPY"],
-    "start_date": "2018-01-01",
-    "n_trials": 100,
-    "algorithm": "optuna"
-  }'
-```
-
-### Python API
-
-```python
-from src.data.loader import DataLoader
-from src.optimization.walk_forward import WalkForwardOptimizer
-from src.optimization.parameter_space import create_parameter_space_from_config
-from src.utils.reporting import print_summary_report
-from src.utils.plotting import create_dashboard
-
-# Load data
-loader = DataLoader(source='yfinance')
-df = loader.load_data('SPY', start_date='2018-01-01', end_date='2023-12-31')
-
-# Create parameter space
-param_space = create_parameter_space_from_config('config/optimization_config.yaml')
-
-# Initialize optimizer
-optimizer = WalkForwardOptimizer(
-    window_type='rolling',
-    train_period_months=12,
-    test_period_months=3,
-    step_size_months=3
-)
-
-# Run optimization
-results = optimizer.run_walk_forward(
-    df,
-    param_space,
-    strategy_func=run_backtest,
-    objective_func=objective_function,
-    n_trials=100,
-    algorithm='optuna'
-)
-
-# Display results
-print_summary_report(results)
-
-# Create visualizations
-create_dashboard(results, combined_equity, param_history, 'results/dashboard')
-```
+- `--data`: Path to CSV file with OHLCV data (default: `data/ohlcv_data.csv`)
+- `--config`: Path to strategy configuration file (default: `config/strategy_params.yaml`)
+- `--initial-capital`: Initial capital for backtest (default: `100000`)
 
 ## Configuration
 
 ### Strategy Parameters (`config/strategy_params.yaml`)
 
-Key parameters to optimize:
+The strategy can be customized by modifying the parameters in the configuration file:
+
+**Entry Signal Parameters:**
 - `strongTrendMinScore`: Minimum score for strong trend entries (default: 1.5)
 - `weakTrendMinScore`: Minimum score for weak trend entries (default: 3.0)
+
+**Exit Management Parameters:**
 - `stopLossPercent`: Initial stop loss percentage (default: 2.0)
 - `takeProfitPercent`: Final take profit percentage (default: 4.0)
-- `adxThreshold`: ADX trend strength threshold (default: 20)
-- Indicator weights: `w_adx`, `w_regime`, `w_pivotTrend`, etc.
+- `partialExitPercent`: First take profit level (default: 1.0)
+- `trailingStopPercent`: Trailing stop distance (default: 0.8)
 
-### Optimization Configuration (`config/optimization_config.yaml`)
+**Indicator Weights:**
+- `w_adx`: ADX weight (default: 1.0)
+- `w_regime`: Regime filter weight (default: 1.0)
+- `w_pivotTrend`: Pivot trend weight (default: 1.5)
+- `w_trendDuration`: Trend duration weight (default: 0.8)
+- `w_mlSupertrend`: ML SuperTrend weight (default: 1.2)
+- `w_linregChannel`: Linear regression weight (default: 0.9)
+- `w_pivotLevels`: Pivot levels weight (default: 0.7)
 
-Walk-forward settings:
-- `window_type`: 'rolling' or 'anchored'
-- `train_period_months`: Training period (default: 12)
-- `test_period_months`: Testing period (default: 3)
-- `step_size_months`: Step size for rolling window (default: 3)
-- `algorithm`: 'optuna', 'grid_search', or 'random_search'
-- `n_trials`: Number of optimization trials (default: 100)
-
-## Testing
-
-Run the test suite:
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
-
-# Run specific test
-pytest tests/test_strategy.py::TestIndicators -v
-```
+And many more indicator-specific parameters. See `config/strategy_params.yaml` for the complete list.
 
 ## Performance Metrics
 
-The framework calculates comprehensive metrics:
+The backtester outputs the following key metrics:
 
 **Return Metrics:**
-- Total Return
-- Annual Return
-- Risk-adjusted returns
+- Total Return: Overall percentage return
+- Sharpe Ratio: Risk-adjusted return metric
 
 **Risk Metrics:**
-- Sharpe Ratio
-- Sortino Ratio
-- Calmar Ratio
-- Maximum Drawdown
-- Ulcer Index
+- Max Drawdown: Maximum peak-to-trough decline
 
 **Trade Metrics:**
-- Win Rate
-- Profit Factor
-- Average Win/Loss
-- Total Trades
-- Expectancy
+- Total Trades: Number of trades executed
+- Win Rate: Percentage of profitable trades
+- Profit Factor: Ratio of gross profit to gross loss
+- Average Win/Loss: Average P&L for winning and losing trades
 
-**Walk-Forward Metrics:**
-- Walk-Forward Efficiency (WFE)
-- Parameter Stability
-- IS vs OOS degradation
+## Output Files
 
-## Visualization
+After running a backtest, the following files are generated:
 
-The framework generates interactive visualizations:
+- `backtest_trades.csv`: Detailed trade-by-trade results
+- `backtest_equity.csv`: Equity curve over time
 
-1. **Equity Curve**: Combined out-of-sample equity with drawdown
-2. **Parameter Evolution**: Parameter changes across windows
-3. **Walk-Forward Efficiency**: IS vs OOS comparison
-4. **Performance Metrics**: Bar charts of key metrics
-5. **Signal Distribution**: Entry signal analysis
-6. **Parameter Stability**: Stability scores
+## Strategy Logic
 
-## Railway Deployment
+The QTAlgo Super26 Strategy uses a multi-indicator approach:
 
-Deploy to Railway.app:
+1. **Indicator Calculation**: Seven technical indicators are calculated on the OHLCV data
+2. **Signal Generation**: Each indicator contributes to a composite score based on its weight
+3. **Entry Logic**: Trades are entered when the composite score exceeds minimum thresholds
+4. **Exit Management**: Positions are managed with a 3-stage system:
+   - Initial stop loss for risk management
+   - Partial profit taking at first target
+   - Trailing stop for remaining position
 
-1. Push code to GitHub
-2. Connect Railway to your repository
-3. Railway will automatically detect `railway.json` and `Dockerfile`
-4. Set environment variables if needed
-5. Deploy!
+## Example
 
-The API will be available at your Railway URL.
+Here's a complete example workflow:
 
-## Examples
+```bash
+# 1. Prepare your data
+# Place a CSV file with 5 years of OHLCV data in the data/ directory
+# Example: data/SPY_5years.csv
 
-See the `notebooks/` directory for detailed examples:
-- `strategy_analysis.ipynb`: Strategy indicator and signal analysis
-- `optimization_results.ipynb`: Walk-forward optimization results
+# 2. Run the backtest
+python main.py --data data/SPY_5years.csv --initial-capital 100000
 
-## Roadmap
-
-- [ ] Add more optimization algorithms (genetic, differential evolution)
-- [ ] Implement position sizing strategies
-- [ ] Add live trading integration
-- [ ] Enhance multi-asset portfolio optimization
-- [ ] Add machine learning enhancements
-- [ ] Real-time monitoring dashboard
-
-## Performance Tips
-
-1. **Use Optuna** for efficient parameter search
-2. **Parallel processing**: Set `n_jobs=-1` in config
-3. **Reduce trials** for faster initial testing
-4. **Cache data**: Load data once and reuse
-5. **Use smaller windows** for rapid prototyping
+# 3. Review the output
+# - Performance metrics will be printed to console
+# - Trade details saved to backtest_trades.csv
+# - Equity curve saved to backtest_equity.csv
+```
 
 ## Contributing
 
 Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
-3. Add tests for new functionality
+3. Make your changes
 4. Submit a pull request
 
 ## License
@@ -299,26 +221,13 @@ This project is licensed under the MIT License.
 
 ## Disclaimer
 
-**Important**: This framework is designed for educational and research purposes. Past performance does not guarantee future results. Always conduct thorough testing before deploying any trading strategy with real capital. The authors are not responsible for any financial losses incurred from using this software.
+**Important**: This software is for educational and research purposes only. Past performance does not guarantee future results. Always conduct thorough testing before deploying any trading strategy with real capital. The authors are not responsible for any financial losses incurred from using this software.
 
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/glover1102/strat-optima/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/glover1102/strat-optima/discussions)
 
-## Citation
-
-If you use this framework in your research, please cite:
-
-```bibtex
-@software{strat_optima,
-  title={QTAlgo Super26 Walk-Forward Optimization Framework},
-  author={QTAlgo Team},
-  year={2024},
-  url={https://github.com/glover1102/strat-optima}
-}
-```
-
 ---
 
-**Built with ❤️ for quantitative traders and researchers**
+**Built for quantitative traders and researchers**
