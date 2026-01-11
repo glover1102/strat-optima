@@ -228,6 +228,6 @@ This project is licensed under the MIT License.
 - **Issues**: [GitHub Issues](https://github.com/glover1102/strat-optima/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/glover1102/strat-optima/discussions)
 
----
+## Acknowledgments
 
 **Built for quantitative traders and researchers**
