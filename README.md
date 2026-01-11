@@ -6,6 +6,23 @@ This is a simple Python-based backtesting environment for the **QTAlgo Super26 S
 
 The strategy combines 7 technical indicators with a dynamic scoring system to generate entry signals and uses a 3-stage exit management system for trade management.
 
+## Quick Start
+
+Get up and running in 3 steps:
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Run backtest with sample data
+python main.py --data data/sample_data.csv
+
+# 3. View results
+# - Performance metrics printed to console
+# - Trade details in backtest_trades.csv
+# - Equity curve in backtest_equity.csv
+```
+
 ## Features
 
 - **Complete Strategy Implementation**: All 7 indicators (ADX, Regime Filter, Pivot Trend, Trend Duration, ML SuperTrend, Linear Regression, Pivot Levels)
