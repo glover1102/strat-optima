@@ -1,8 +1,11 @@
 """
-Signal Generation Logic for QTAlgo Super26 Strategy
+QTAlgo Super26 Strategy - Signal Generation Module
 
-Implements the dynamic scoring system that combines all indicators
-with configurable weights and ADX-based penalty system.
+This module implements the signal generation logic with dynamic scoring system:
+- Combines all 7 indicators with configurable weights
+- ADX-based penalty system for weak trends
+- Dynamic minimum score thresholds
+- Signal strength classification
 """
 
 import numpy as np
@@ -10,267 +13,333 @@ import pandas as pd
 from typing import Dict, Tuple
 
 
-class SignalGenerator:
+def calculate_indicator_scores(df: pd.DataFrame, weights: Dict[str, float]) -> pd.DataFrame:
     """
-    Generates trading signals based on the QTAlgo Super26 strategy.
-    
-    Combines scores from all 7 indicators with configurable weights
-    and applies ADX-based penalties for weak trends.
-    """
-    
-    def __init__(self, params: Dict):
-        """
-        Initialize signal generator with parameters.
-        
-        Args:
-            params: Dictionary containing strategy parameters including:
-                - strongTrendMinScore: Minimum score for strong trend entries
-                - weakTrendMinScore: Minimum score for weak trend entries
-                - adx_threshold: ADX threshold for trend classification
-                - Indicator weights (w_adx, w_regime, etc.)
-        """
-        self.params = params
-        
-        # Entry thresholds
-        self.strong_trend_min = params.get('strongTrendMinScore', 1.5)
-        self.weak_trend_min = params.get('weakTrendMinScore', 3.0)
-        self.adx_threshold = params.get('adx_threshold', 20)
-        
-        # Indicator weights
-        self.weights = {
-            'adx': params.get('w_adx', 1.0),
-            'regime': params.get('w_regime', 1.0),
-            'pivot_trend': params.get('w_pivotTrend', 1.0),
-            'trend_duration': params.get('w_trendDuration', 1.0),
-            'ml_supertrend': params.get('w_mlSupertrend', 1.0),
-            'linreg': params.get('w_linReg', 1.0),
-            'pivot_levels': params.get('w_pivotLevels', 1.0),
-        }
-    
-    def calculate_composite_score(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Calculate composite score from all indicators.
-        
-        Args:
-            df: DataFrame with all indicator scores
-            
-        Returns:
-            Series with composite scores
-        """
-        score = (
-            self.weights['adx'] * df['adx_score'] +
-            self.weights['regime'] * df['regime_score'] +
-            self.weights['pivot_trend'] * df['pivot_trend_score'] +
-            self.weights['trend_duration'] * df['trend_duration_score'] +
-            self.weights['ml_supertrend'] * df['ml_supertrend_score'] +
-            self.weights['linreg'] * df['linreg_score'] +
-            self.weights['pivot_levels'] * df['pivot_levels_score']
-        )
-        
-        return score
-    
-    def apply_adx_penalty(self, score: pd.Series, adx: pd.Series,
-                         is_strong_trend: pd.Series) -> pd.Series:
-        """
-        Apply ADX-based penalty for weak trends.
-        
-        In weak trend conditions (ADX < threshold), signals require
-        higher confirmation scores.
-        
-        Args:
-            score: Composite score series
-            adx: ADX values
-            is_strong_trend: Boolean series indicating strong trends
-            
-        Returns:
-            Adjusted score series
-        """
-        # In weak trends, double the required score threshold
-        penalty = np.where(~is_strong_trend, 0.5, 1.0)
-        adjusted_score = score * penalty
-        
-        return adjusted_score
-    
-    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Generate entry and exit signals based on indicator scores.
-        
-        Args:
-            df: DataFrame with all indicator columns
-            
-        Returns:
-            DataFrame with signal columns added:
-                - composite_score: Raw composite score
-                - is_strong_trend: Boolean for strong trend
-                - adjusted_score: Score after ADX penalty
-                - signal: 1 for long, -1 for short, 0 for no signal
-                - signal_strength: Absolute value of adjusted score
-        """
-        result = df.copy()
-        
-        # Calculate composite score
-        composite_score = self.calculate_composite_score(result)
-        result['composite_score'] = composite_score
-        
-        # Determine if strong trend
-        is_strong_trend = result['adx'] >= self.adx_threshold
-        result['is_strong_trend'] = is_strong_trend
-        
-        # Apply ADX penalty
-        adjusted_score = self.apply_adx_penalty(
-            composite_score, 
-            result['adx'],
-            is_strong_trend
-        )
-        result['adjusted_score'] = adjusted_score
-        
-        # Generate signals based on thresholds
-        signal = np.zeros(len(result))
-        
-        # Long signals
-        long_strong = (is_strong_trend & 
-                      (adjusted_score >= self.strong_trend_min))
-        long_weak = (~is_strong_trend & 
-                    (adjusted_score >= self.weak_trend_min))
-        signal = np.where(long_strong | long_weak, 1, signal)
-        
-        # Short signals
-        short_strong = (is_strong_trend & 
-                       (adjusted_score <= -self.strong_trend_min))
-        short_weak = (~is_strong_trend & 
-                     (adjusted_score <= -self.weak_trend_min))
-        signal = np.where(short_strong | short_weak, -1, signal)
-        
-        result['signal'] = signal
-        result['signal_strength'] = np.abs(adjusted_score)
-        
-        return result
-    
-    def detect_signal_reversal(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Detect signal reversals (flip from long to short or vice versa).
-        
-        Args:
-            df: DataFrame with signal column
-            
-        Returns:
-            Boolean series indicating reversal points
-        """
-        signal_change = df['signal'] != df['signal'].shift(1)
-        signal_flip = (
-            ((df['signal'] == 1) & (df['signal'].shift(1) == -1)) |
-            ((df['signal'] == -1) & (df['signal'].shift(1) == 1))
-        )
-        
-        return signal_change & signal_flip
-    
-    def detect_signal_weakening(self, df: pd.DataFrame, 
-                               threshold_pct: float = 0.3) -> pd.Series:
-        """
-        Detect when signal strength is weakening significantly.
-        
-        Args:
-            df: DataFrame with signal_strength column
-            threshold_pct: Percentage threshold for weakening detection
-            
-        Returns:
-            Boolean series indicating weakening signals
-        """
-        strength_change = df['signal_strength'].pct_change()
-        weakening = strength_change < -threshold_pct
-        
-        return weakening
-
-
-def generate_signals(df: pd.DataFrame, params: Dict) -> pd.DataFrame:
-    """
-    Convenience function to generate signals from DataFrame.
+    Calculate individual indicator scores
     
     Args:
-        df: DataFrame with all indicator columns
-        params: Strategy parameters dictionary
+        df: DataFrame with all indicators calculated
+        weights: Dictionary of indicator weights
         
     Returns:
-        DataFrame with signals added
+        DataFrame with individual indicator scores
     """
-    generator = SignalGenerator(params)
-    result = generator.generate_signals(df)
+    result = df.copy()
     
-    # Add reversal and weakening detection
-    result['signal_reversal'] = generator.detect_signal_reversal(result)
-    result['signal_weakening'] = generator.detect_signal_weakening(result)
+    # ADX Score
+    # Score based on trend strength and directional indicators
+    adx_score = np.where(
+        (result['adx'] >= 25) & (result['plus_di'] > result['minus_di']), weights['w_adx'],
+        np.where(
+            (result['adx'] >= 25) & (result['plus_di'] < result['minus_di']), -weights['w_adx'],
+            np.where(
+                (result['adx'] >= 20) & (result['plus_di'] > result['minus_di']), weights['w_adx'] * 0.5,
+                np.where(
+                    (result['adx'] >= 20) & (result['plus_di'] < result['minus_di']), -weights['w_adx'] * 0.5,
+                    0
+                )
+            )
+        )
+    )
+    
+    # Regime Filter Score
+    regime_score = result['regime_signal'] * weights['w_regime']
+    
+    # Pivot Trend Score (primary signal)
+    pivot_score = result['pivot_trend'] * weights['w_pivotTrend']
+    
+    # Trend Duration Score
+    trend_duration_score = result['trend_signal'] * weights['w_trendDuration']
+    
+    # ML SuperTrend Score
+    ml_supertrend_score = result['ml_supertrend'] * weights['w_mlSupertrend']
+    
+    # Linear Regression Channel Score
+    linreg_score = result['linreg_signal'] * weights['w_linregChannel']
+    
+    # Pivot Levels Score
+    pivot_levels_score = result['pivot_signal'] * weights['w_pivotLevels']
+    
+    result['score_adx'] = adx_score
+    result['score_regime'] = regime_score
+    result['score_pivot_trend'] = pivot_score
+    result['score_trend_duration'] = trend_duration_score
+    result['score_ml_supertrend'] = ml_supertrend_score
+    result['score_linreg'] = linreg_score
+    result['score_pivot_levels'] = pivot_levels_score
     
     return result
 
 
-def calculate_entry_price(df: pd.DataFrame, signal: int, 
-                         slippage: float = 0.0005) -> float:
+def calculate_total_score(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate entry price with slippage.
+    Calculate total composite score from all indicators
     
     Args:
-        df: DataFrame row with OHLC data
-        signal: 1 for long, -1 for short
-        slippage: Slippage percentage
+        df: DataFrame with individual indicator scores
         
     Returns:
-        Entry price adjusted for slippage
+        DataFrame with total score
     """
-    close_price = df['close']
+    result = df.copy()
     
-    if signal == 1:  # Long entry
-        entry_price = close_price * (1 + slippage)
-    elif signal == -1:  # Short entry
-        entry_price = close_price * (1 - slippage)
-    else:
-        entry_price = close_price
-    
-    return entry_price
-
-
-def validate_signal(df: pd.DataFrame, idx: int, params: Dict) -> bool:
-    """
-    Validate if a signal at given index meets all conditions.
-    
-    Performs additional validation checks beyond basic scoring:
-    - Ensures indicator values are not NaN
-    - Checks for minimum data requirements
-    - Validates signal consistency
-    
-    Args:
-        df: DataFrame with all columns
-        idx: Index to validate
-        params: Strategy parameters
-        
-    Returns:
-        True if signal is valid, False otherwise
-    """
-    if idx < 0 or idx >= len(df):
-        return False
-    
-    row = df.iloc[idx]
-    
-    # Check for NaN values in critical indicators
-    critical_cols = [
-        'adx', 'composite_score', 'adjusted_score', 'signal'
+    score_columns = [
+        'score_adx',
+        'score_regime',
+        'score_pivot_trend',
+        'score_trend_duration',
+        'score_ml_supertrend',
+        'score_linreg',
+        'score_pivot_levels'
     ]
     
-    for col in critical_cols:
-        if col in row and pd.isna(row[col]):
-            return False
+    # Sum all indicator scores
+    result['total_score'] = result[score_columns].sum(axis=1)
     
-    # Check if signal is valid (not 0)
-    if row['signal'] == 0:
-        return False
+    # Separate long and short scores
+    result['long_score'] = result['total_score'].clip(lower=0)
+    result['short_score'] = abs(result['total_score'].clip(upper=0))
     
-    # Check minimum lookback period has passed
-    min_lookback = max(
-        params.get('adx_length', 14),
-        params.get('regime_hma_length', 21),
-        params.get('linreg_length', 50)
+    return result
+
+
+def apply_adx_penalty(df: pd.DataFrame, adx_threshold: float = 20) -> pd.DataFrame:
+    """
+    Apply ADX-based penalty for weak trends
+    
+    Args:
+        df: DataFrame with scores and ADX
+        adx_threshold: ADX threshold for weak trend detection
+        
+    Returns:
+        DataFrame with adjusted scores
+    """
+    result = df.copy()
+    
+    # Penalty factor based on ADX
+    # If ADX < threshold, reduce the score
+    penalty_factor = np.where(
+        result['adx'] < adx_threshold,
+        result['adx'] / adx_threshold,  # Scale down proportionally
+        1.0  # No penalty
     )
     
-    if idx < min_lookback:
-        return False
+    result['penalty_factor'] = penalty_factor
+    result['adjusted_long_score'] = result['long_score'] * penalty_factor
+    result['adjusted_short_score'] = result['short_score'] * penalty_factor
     
-    return True
+    return result
+
+
+def generate_entry_signals(df: pd.DataFrame, 
+                          strong_trend_min_score: float = 1.5,
+                          weak_trend_min_score: float = 3.0,
+                          adx_threshold: float = 20) -> pd.DataFrame:
+    """
+    Generate entry signals based on dynamic scoring
+    
+    Args:
+        df: DataFrame with adjusted scores
+        strong_trend_min_score: Minimum score for strong trend entries
+        weak_trend_min_score: Minimum score for weak trend entries
+        adx_threshold: ADX threshold for trend strength
+        
+    Returns:
+        DataFrame with entry signals
+    """
+    result = df.copy()
+    
+    # Determine if we're in a strong or weak trend
+    is_strong_trend = result['adx'] >= adx_threshold
+    
+    # Dynamic threshold based on trend strength
+    long_threshold = np.where(is_strong_trend, strong_trend_min_score, weak_trend_min_score)
+    short_threshold = np.where(is_strong_trend, strong_trend_min_score, weak_trend_min_score)
+    
+    # Generate signals
+    long_signal = (result['adjusted_long_score'] >= long_threshold) & (result['adjusted_long_score'] > result['adjusted_short_score'])
+    short_signal = (result['adjusted_short_score'] >= short_threshold) & (result['adjusted_short_score'] > result['adjusted_long_score'])
+    
+    # Signal values: 1 = long, -1 = short, 0 = no signal
+    result['entry_signal'] = np.where(long_signal, 1,
+                                      np.where(short_signal, -1, 0))
+    
+    # Signal strength classification
+    max_score = np.maximum(result['adjusted_long_score'], result['adjusted_short_score'])
+    result['signal_strength'] = np.where(
+        max_score >= weak_trend_min_score * 1.5, 'very_strong',
+        np.where(
+            max_score >= weak_trend_min_score, 'strong',
+            np.where(
+                max_score >= strong_trend_min_score, 'moderate',
+                'weak'
+            )
+        )
+    )
+    
+    return result
+
+
+def detect_signal_reversal(df: pd.DataFrame, lookback: int = 3) -> pd.DataFrame:
+    """
+    Detect signal reversals and weakening
+    
+    Args:
+        df: DataFrame with entry signals
+        lookback: Number of bars to look back for reversal detection
+        
+    Returns:
+        DataFrame with reversal signals
+    """
+    result = df.copy()
+    
+    # Signal change detection
+    signal_changed = result['entry_signal'] != result['entry_signal'].shift(1)
+    
+    # Detect score weakening
+    current_score = np.maximum(result['adjusted_long_score'], result['adjusted_short_score'])
+    avg_score = current_score.rolling(window=lookback).mean()
+    
+    score_weakening = current_score < (avg_score * 0.7)  # 30% decline from average
+    
+    # Reversal signal
+    result['signal_reversal'] = signal_changed
+    result['score_weakening'] = score_weakening
+    
+    return result
+
+
+def generate_all_signals(df: pd.DataFrame, params: Dict) -> pd.DataFrame:
+    """
+    Generate all trading signals for the Super26 strategy
+    
+    Args:
+        df: DataFrame with all indicators calculated
+        params: Dictionary of strategy parameters
+        
+    Returns:
+        DataFrame with all signals
+    """
+    # Extract parameters
+    weights = {
+        'w_adx': params.get('w_adx', 1.0),
+        'w_regime': params.get('w_regime', 1.0),
+        'w_pivotTrend': params.get('w_pivotTrend', 1.5),
+        'w_trendDuration': params.get('w_trendDuration', 0.8),
+        'w_mlSupertrend': params.get('w_mlSupertrend', 1.2),
+        'w_linregChannel': params.get('w_linregChannel', 0.9),
+        'w_pivotLevels': params.get('w_pivotLevels', 0.7)
+    }
+    
+    strong_trend_min_score = params.get('strongTrendMinScore', 1.5)
+    weak_trend_min_score = params.get('weakTrendMinScore', 3.0)
+    adx_threshold = params.get('adxThreshold', 20)
+    
+    # Calculate scores
+    result = calculate_indicator_scores(df, weights)
+    result = calculate_total_score(result)
+    result = apply_adx_penalty(result, adx_threshold)
+    
+    # Generate signals
+    result = generate_entry_signals(result, 
+                                   strong_trend_min_score,
+                                   weak_trend_min_score,
+                                   adx_threshold)
+    
+    # Detect reversals
+    result = detect_signal_reversal(result)
+    
+    return result
+
+
+def get_signal_details(df: pd.DataFrame, index: int) -> Dict:
+    """
+    Get detailed signal information for a specific bar
+    
+    Args:
+        df: DataFrame with signals
+        index: Index of the bar
+        
+    Returns:
+        Dictionary with signal details
+    """
+    if index < 0 or index >= len(df):
+        return {}
+    
+    row = df.iloc[index]
+    
+    details = {
+        'entry_signal': row['entry_signal'],
+        'signal_strength': row['signal_strength'],
+        'total_score': row['total_score'],
+        'long_score': row['long_score'],
+        'short_score': row['short_score'],
+        'adjusted_long_score': row['adjusted_long_score'],
+        'adjusted_short_score': row['adjusted_short_score'],
+        'penalty_factor': row['penalty_factor'],
+        'adx': row['adx'],
+        'individual_scores': {
+            'adx': row['score_adx'],
+            'regime': row['score_regime'],
+            'pivot_trend': row['score_pivot_trend'],
+            'trend_duration': row['score_trend_duration'],
+            'ml_supertrend': row['score_ml_supertrend'],
+            'linreg': row['score_linreg'],
+            'pivot_levels': row['score_pivot_levels']
+        },
+        'reversal_signals': {
+            'signal_reversal': row['signal_reversal'],
+            'score_weakening': row['score_weakening']
+        }
+    }
+    
+    return details
+
+
+def filter_signals(df: pd.DataFrame, 
+                  min_bars_between_signals: int = 5,
+                  require_all_indicators: bool = False) -> pd.DataFrame:
+    """
+    Filter signals based on additional criteria
+    
+    Args:
+        df: DataFrame with signals
+        min_bars_between_signals: Minimum bars between consecutive signals
+        require_all_indicators: If True, require all indicators to agree
+        
+    Returns:
+        DataFrame with filtered signals
+    """
+    result = df.copy()
+    
+    # Filter by minimum bars between signals
+    if min_bars_between_signals > 0:
+        filtered_signal = result['entry_signal'].copy()
+        last_signal_idx = -min_bars_between_signals
+        
+        for i in range(len(result)):
+            if result['entry_signal'].iloc[i] != 0:
+                if i - last_signal_idx < min_bars_between_signals:
+                    filtered_signal.iloc[i] = 0
+                else:
+                    last_signal_idx = i
+        
+        result['filtered_entry_signal'] = filtered_signal
+    else:
+        result['filtered_entry_signal'] = result['entry_signal']
+    
+    # Require all indicators to agree (unanimous)
+    if require_all_indicators:
+        score_columns = ['score_adx', 'score_regime', 'score_pivot_trend', 
+                        'score_trend_duration', 'score_ml_supertrend', 
+                        'score_linreg', 'score_pivot_levels']
+        
+        all_bullish = (result[score_columns] > 0).all(axis=1)
+        all_bearish = (result[score_columns] < 0).all(axis=1)
+        
+        result['filtered_entry_signal'] = np.where(
+            all_bullish & (result['filtered_entry_signal'] == 1), 1,
+            np.where(all_bearish & (result['filtered_entry_signal'] == -1), -1, 0)
+        )
+    
+    return result
